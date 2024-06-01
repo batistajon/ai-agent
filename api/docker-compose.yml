@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  chromadb:
+    build:
+      context: .
+    volumes:
+      - ./chroma:/chroma/chroma
+    ports:
+      - '8000:8000'
