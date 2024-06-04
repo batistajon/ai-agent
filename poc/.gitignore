@@ -7,6 +7,8 @@
 node_modules/
 dist/
 chroma/
+.env
+.chainlit
 # Compiled Java class files
 *.class
 

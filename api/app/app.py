@@ -27,10 +27,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-chroma_client = chromadb.HttpClient(
-    host="localhost",
-    port=8000
-)
+# chroma_client = chromadb.HttpClient(
+#     host="localhost",
+#     port=8000
+# )
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
 
@@ -57,6 +57,12 @@ raw_prompt = PromptTemplate.from_template(
     [/INST]
 """
 )
+
+@app.route("/", methods=["GET"])
+def index():
+    logging.info("Assistente disponivel")
+    response = {"message": "assistente disponivel 3"}
+    return response
 
 @app.route("/ai", methods=["POST"])
 def aiPost():
@@ -87,10 +93,9 @@ def pdfPost():
     chunks = text_splitter.split_documents(documents=docs)
     logging.info(f"chunks len: {len(chunks)}")
 
-    vector_store = Chroma.from_documents(documents=chunks, embedding=embedding, client=chroma_client, collection_name=collection)
+    # vector_store = Chroma.from_documents(documents=chunks, embedding=embedding, client=chroma_client, collection_name=collection, persist_directory="/chroma/chroma")
+    vector_store = Chroma.from_documents(documents=chunks, embedding=embedding, collection_name=collection, persist_directory="db")
     logging.info("Vector store created successfully.")
-    # vector_store.persist()
-    # logging.info("Vector store Persited successfully.")
 
     response = {
         "status": "Successfully Uploaded",
@@ -111,7 +116,8 @@ def askPDFPost():
     logging.info(f"collection: {collection}")
 
     logging.info(f"Loading Vector Store")
-    vector_store = Chroma(client=chroma_client, collection_name=collection)
+    # vector_store = Chroma(client=chroma_client, embedding_function=embedding, collection_name=collection, persist_directory="/chroma/chroma")
+    vector_store = Chroma(embedding_function=embedding, collection_name=collection, persist_directory="db")
 
     logging.info("Creating chain")
 

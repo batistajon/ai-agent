@@ -5,10 +5,9 @@ RUN apt update && \
 
 WORKDIR /app
 
-COPY app/ /app/
+COPY requirements.txt /app/requirements.txt
 
 RUN pip install --upgrade pip && \
   pip install -r /app/requirements.txt
 
-EXPOSE 5000
-EXPOSE 5001
+EXPOSE 8000

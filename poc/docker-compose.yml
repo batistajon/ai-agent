@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  flask:
+    build:
+      context: .
+    volumes:
+      - .:/app
+    ports:
+      - '8000:8000'
+    command: chainlit run /app/custom.py
+
+  # chromadb:
+  #   image: chromadb/chroma:0.5.1.dev13
+  #   volumes:
+  #     - ./chroma:/chroma/chroma
+  #   ports:
+  #     - '8000:8000'
+
+  # ollama:
+  #   image: ollama/ollama
+  #   volumes:
+  #     - ./ollama:/root/.ollama
+  #   ports:
+  #     - '11434:11434'

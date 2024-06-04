@@ -1,10 +1,26 @@
 version: '3'
 
 services:
-  chromadb:
+  flask:
     build:
       context: .
+    volumes:
+      - ./app:/app
+    ports:
+      - '5000:5000'
+      - '5001:5001'
+    command: python /app/app.py
+
+  chromadb:
+    image: chromadb/chroma:0.5.1.dev13
     volumes:
       - ./chroma:/chroma/chroma
     ports:
       - '8000:8000'
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ./ollama:/root/.ollama
+    ports:
+      - '11434:11434'
