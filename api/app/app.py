@@ -62,7 +62,7 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 def get_or_create_tenant_for_user(client):
-    tenant_id = f"tenant_user:{client}"
+    tenant_id = f"tenant_{client}"
     try:
         admin_client.get_tenant(tenant_id)
     except Exception as e:
@@ -70,7 +70,7 @@ def get_or_create_tenant_for_user(client):
     return tenant_id
 
 def get_or_create_db_for_user(category, tenant):
-    database = f"db:{category}"
+    database = f"db_{category}"
     try:
         admin_client.get_database(database)
     except Exception as e:
@@ -171,14 +171,14 @@ async def ask_pdf(
     logging.info(f"collection: {subject}")
 
     logging.info(f"Loading Vector Store")
-    tenant = get_or_create_tenant_for_user(client)
-    database = get_or_create_db_for_user(category, tenant)
+    tenant = admin_client.get_tenant(f"tenant_{client}")
+    database = admin_client.get_database(f"db_{category}", tenant['name'])
 
     chroma_client = chromadb.HttpClient(
         host="localhost",
         port=8000,
-        tenant=tenant,
-        database=database
+        tenant=tenant['name'],
+        database=database['name']
     )
     vector_store = Chroma(
         client=chroma_client,
