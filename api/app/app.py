@@ -4,68 +4,94 @@ import sys
 import tiktoken
 import chromadb
 
-from chromadb.config import Settings
+from chromadb import Settings
 from dotenv import load_dotenv
 
-from flask import Flask, request
-from flask_cors import CORS
+from fastapi import FastAPI, Request, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from langchain_core.caches import BaseCache
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from langchain_community.llms import Ollama
+from langchain_community.chat_models import ChatOllama
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PDFPlumberLoader
 
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
 from langchain.prompts import PromptTemplate
+from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
+from langchain.schema.runnable import RunnablePassthrough
+
+from models.collection import Collection
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
 
-# chroma_client = chromadb.HttpClient(
-#     host="localhost",
-#     port=8000
-# )
+origins = [
+    "http://localhost.com",
+    "https://localhost.com",
+    "http://localhost",
+    "http://localhost:5000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+admin_client = chromadb.AdminClient(Settings(
+  chroma_api_impl="chromadb.api.fastapi.FastAPI",
+  chroma_server_host="localhost",
+  chroma_server_http_port="8000",
+))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
 
-cached_llm = Ollama(model="llama3", base_url="http://localhost:11434")
+cached_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 embedding = FastEmbedEmbeddings()
-
 enc = tiktoken.get_encoding("cl100k_base")
+
 def length_function(text: str) -> int:
     return len(enc.encode(text))
 
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+def get_or_create_tenant_for_user(client):
+    tenant_id = f"tenant_user:{client}"
+    try:
+        admin_client.get_tenant(tenant_id)
+    except Exception as e:
+        admin_client.create_tenant(tenant_id)
+    return tenant_id
+
+def get_or_create_db_for_user(category, tenant):
+    database = f"db:{category}"
+    try:
+        admin_client.get_database(database)
+    except Exception as e:
+        admin_client.create_database(database, tenant)
+    return database
+
 text_splitter = RecursiveCharacterTextSplitter(
     separators=["\n\n", "\n", " ", ""],
-    chunk_size=1024,
-    chunk_overlap=80,
+    chunk_size=100,
+    chunk_overlap=20,
     length_function=length_function
 )
 
-raw_prompt = PromptTemplate.from_template(
-    """
-    <s>[INST] You are a technical assistant good at searching documents. If you do not have an answer from the provided information say so. [/INST] </s>
-    [INST] {input}
-           Context: {context}
-           Answer:
-    [/INST]
-"""
-)
-
-@app.route("/", methods=["GET"])
+@app.get("/")
 def index():
     logging.info("Assistente disponivel")
-    response = {"message": "assistente disponivel 3"}
+    response = {"message": "assistente disponivel"}
     return response
 
-@app.route("/ai", methods=["POST"])
-def aiPost():
+@app.post("/ai")
+def ask_ai(request: Request):
     logging.info("Post /ai called")
     json_content = request.json
     query = json_content.get("query")
@@ -74,28 +100,53 @@ def aiPost():
     response = {"answer": llm_response}
     return response
 
-@app.route("/pdf", methods=["POST"])
-def pdfPost():
-    logging.info("Post /pdfPost called")
-    collection = request.form["collection"]
-
-    file = request.files["file"]
+@app.post("/pdf")
+async def create_upload_pdf(
+    request: Request,
+    client: str,
+    category: str,
+    subject: str,
+    file: UploadFile = File(...)
+):
+    logging.info("Post /pdf called")
     file_name = file.filename
-    save_file = "documents/" + file_name
-    file.save(save_file)
-
+    file_content = await file.read()
     logging.info(f"filename: {file_name}")
 
-    loader = PDFPlumberLoader(save_file)
+    os.makedirs("documents", exist_ok=True)
+    tmp_file_name = f"{subject}_{file_name}"
+    tmp_file_path = os.path.join("documents", tmp_file_name)
+
+    with open(tmp_file_path, "wb") as f:
+        f.write(file_content)
+
+    loader = PDFPlumberLoader(tmp_file_path)
     docs = loader.load_and_split()
     logging.info(f"docs: {len(docs)}")
 
-    chunks = text_splitter.split_documents(documents=docs)
+    chunks = text_splitter.split_documents(docs)
     logging.info(f"chunks len: {len(chunks)}")
 
-    # vector_store = Chroma.from_documents(documents=chunks, embedding=embedding, client=chroma_client, collection_name=collection, persist_directory="/chroma/chroma")
-    vector_store = Chroma.from_documents(documents=chunks, embedding=embedding, collection_name=collection, persist_directory="db")
+    tenant = get_or_create_tenant_for_user(client)
+    database = get_or_create_db_for_user(category, tenant)
+
+    chroma_client = chromadb.HttpClient(
+        host="localhost",
+        port=8000,
+        tenant=tenant,
+        database=database
+    )
+    chroma_client.get_or_create_collection(subject)
+    Chroma.from_documents(
+        documents=chunks,
+        embedding=embedding,
+        client=chroma_client,
+        collection_name=subject,
+        persist_directory="/chroma/chroma"
+    )
     logging.info("Vector store created successfully.")
+
+    os.remove(tmp_file_path)
 
     response = {
         "status": "Successfully Uploaded",
@@ -106,18 +157,35 @@ def pdfPost():
 
     return response
 
-@app.route("/ask-pdf", methods=["POST"])
-def askPDFPost():
+@app.post("/ask-pdf")
+async def ask_pdf(
+    request: Request,
+    client: str,
+    category: str,
+    subject: str,
+    query: str,
+    prompt: str
+):
     logging.info("Post /askPDFPost called")
-    json_content = request.json
-    query = json_content.get("query")
-    collection = json_content.get("collection")
     logging.info(f"query: {query}")
-    logging.info(f"collection: {collection}")
+    logging.info(f"collection: {subject}")
 
     logging.info(f"Loading Vector Store")
-    # vector_store = Chroma(client=chroma_client, embedding_function=embedding, collection_name=collection, persist_directory="/chroma/chroma")
-    vector_store = Chroma(embedding_function=embedding, collection_name=collection, persist_directory="db")
+    tenant = get_or_create_tenant_for_user(client)
+    database = get_or_create_db_for_user(category, tenant)
+
+    chroma_client = chromadb.HttpClient(
+        host="localhost",
+        port=8000,
+        tenant=tenant,
+        database=database
+    )
+    vector_store = Chroma(
+        client=chroma_client,
+        embedding_function=embedding,
+        collection_name=subject,
+        persist_directory="/chroma/chroma"
+    )
 
     logging.info("Creating chain")
 
@@ -129,22 +197,32 @@ def askPDFPost():
         },
     )
 
-    document_chain = create_stuff_documents_chain(cached_llm, raw_prompt)
-    chain = create_retrieval_chain(retriever, document_chain)
+    logging.info("Retrieved Documents:")
+    relevant_documents = retriever.get_relevant_documents(query)
 
-    result = chain.invoke({"input": query})
+    logging.info("Relevant Documents:")
+    references = []
+    for doc in relevant_documents:
+        reference = {"filename": doc.metadata.get('source'), "content": doc.page_content}
+        references.append(reference)
+
+    prompt = PromptTemplate(template=prompt, input_variables=['question'])
+    llm_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | cached_llm
+        | StrOutputParser()
+    )
+    result = await llm_chain.ainvoke(query)
 
     logging.info(result)
 
-    sources = []
-    for doc in result["context"]:
-        sources.append(
-            {"source": doc.metadata["source"], "page_content": doc.page_content}
-        )
+    response_answer = {
+        "answer": result,
+        "references": references
+    }
 
-    response_answer = {"answer": result["answer"], "sources": sources}
     return response_answer
-
 
 if __name__ == '__main__':
     debug_mode = os.getenv('DEBUG', 'False').lower() in ['true', '1']
