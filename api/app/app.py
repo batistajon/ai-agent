@@ -1,8 +1,9 @@
 import os
 import logging
 import sys
-import tiktoken
 import chromadb
+
+from .helpers import length_function, format_docs
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -53,13 +54,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(m
 
 cached_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 embedding = FastEmbedEmbeddings()
-enc = tiktoken.get_encoding("cl100k_base")
-
-def length_function(text: str) -> int:
-    return len(enc.encode(text))
-
-def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
 
 def get_or_create_tenant_for_user(client):
     tenant_id = f"tenant_{client}"
