@@ -1,15 +1,17 @@
 import os
 import logging
 import sys
+import json
 import chromadb
 
-from .helpers import length_function, format_docs
+from helpers import length_function, format_docs
 
 from chromadb import Settings
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from langchain_core.caches import BaseCache
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -27,13 +29,16 @@ from models.collection import Collection
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="Assistente CAQO")
 
 origins = [
     "http://localhost.com",
     "https://localhost.com",
     "http://localhost",
     "http://localhost:5000",
+    "http://localhost:8501",
+    "http://localhost:8501",
+    "http://localhost:8000",
 ]
 
 app.add_middleware(
@@ -71,13 +76,6 @@ def get_or_create_db_for_user(category, tenant):
         admin_client.create_database(database, tenant)
     return database
 
-text_splitter = RecursiveCharacterTextSplitter(
-    separators=["\n\n", "\n", " ", ""],
-    chunk_size=100,
-    chunk_overlap=20,
-    length_function=length_function
-)
-
 @app.get("/")
 def index():
     logging.info("Assistente disponivel")
@@ -85,7 +83,10 @@ def index():
     return response
 
 @app.post("/ai")
-def ask_ai(request: Request):
+def ask_ai(
+    request: Request,
+    token: str
+):
     logging.info("Post /ai called")
     json_content = request.json
     query = json_content.get("query")
@@ -97,11 +98,21 @@ def ask_ai(request: Request):
 @app.post("/pdf")
 async def create_upload_pdf(
     request: Request,
+    token: str,
     client: str,
     category: str,
     subject: str,
+    chunk_size: int = 800,
+    chunk_overlap: int = 150,
     file: UploadFile = File(...)
 ):
+    with open("token.json", 'r') as token_json:
+        clients = json.load(token_json)
+        if clients.get("client") != client:
+            raise Exception("Invalid client")
+        if clients.get("token") != token:
+            raise Exception("Invalid token")
+
     logging.info("Post /pdf called")
     file_name = file.filename
     file_content = await file.read()
@@ -114,6 +125,12 @@ async def create_upload_pdf(
     with open(tmp_file_path, "wb") as f:
         f.write(file_content)
 
+    text_splitter = RecursiveCharacterTextSplitter(
+        separators=["\n\n", "\n", " ", ""],
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=length_function
+    )
     loader = PDFPlumberLoader(tmp_file_path)
     docs = loader.load_and_split()
     logging.info(f"docs: {len(docs)}")
@@ -151,22 +168,32 @@ async def create_upload_pdf(
 
     return response
 
+class AskPDFRequest(BaseModel):
+    token: str
+    client: str
+    category: str
+    subject: str
+    query: str
+    prompt: str
+
 @app.post("/ask-pdf")
 async def ask_pdf(
-    request: Request,
-    client: str,
-    category: str,
-    subject: str,
-    query: str,
-    prompt: str
+    request: AskPDFRequest
 ):
     logging.info("Post /askPDFPost called")
-    logging.info(f"query: {query}")
-    logging.info(f"collection: {subject}")
+    with open("token.json", 'r') as token_json:
+        clients = json.load(token_json)
+        if clients.get("client") != request.client:
+            raise Exception("Invalid client")
+        if clients.get("token") != request.token:
+            raise Exception("Invalid token")
+
+    logging.info(f"query: {request.query}")
+    logging.info(f"collection: {request.subject}")
 
     logging.info(f"Loading Vector Store")
-    tenant = admin_client.get_tenant(f"tenant_{client}")
-    database = admin_client.get_database(f"db_{category}", tenant['name'])
+    tenant = admin_client.get_tenant(f"tenant_{request.client}")
+    database = admin_client.get_database(f"db_{request.category}", tenant['name'])
 
     chroma_client = chromadb.HttpClient(
         host="localhost",
@@ -177,11 +204,10 @@ async def ask_pdf(
     vector_store = Chroma(
         client=chroma_client,
         embedding_function=embedding,
-        collection_name=subject,
+        collection_name=request.subject,
         persist_directory="/chroma/chroma"
     )
 
-    logging.info("Creating chain")
 
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
@@ -192,7 +218,7 @@ async def ask_pdf(
     )
 
     logging.info("Retrieved Documents:")
-    relevant_documents = retriever.get_relevant_documents(query)
+    relevant_documents = retriever.get_relevant_documents(request.query)
 
     logging.info("Relevant Documents:")
     references = []
@@ -200,14 +226,15 @@ async def ask_pdf(
         reference = {"filename": doc.metadata.get('source'), "content": doc.page_content}
         references.append(reference)
 
-    prompt = PromptTemplate(template=prompt, input_variables=['question'])
+    prompt = PromptTemplate(template=request.prompt, input_variables=['question'])
+    logging.info("Creating chain")
     llm_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | cached_llm
         | StrOutputParser()
     )
-    result = await llm_chain.ainvoke(query)
+    result = await llm_chain.ainvoke(request.query)
 
     logging.info(result)
 
@@ -217,7 +244,3 @@ async def ask_pdf(
     }
 
     return response_answer
-
-if __name__ == '__main__':
-    debug_mode = os.getenv('DEBUG', 'False').lower() in ['true', '1']
-    app.run(port=5001, host='0.0.0.0', debug=debug_mode)

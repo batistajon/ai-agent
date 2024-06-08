@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "app.app:app",  // Ensure this path points to your FastAPI instance
+                "app.main:app",
                 "--host", "0.0.0.0",
                 "--port", "5000",
                 "--reload"
@@ -23,7 +23,7 @@
             "request": "launch",
             "module": "flask",
             "env": {
-                "FLASK_APP": "app/app.py",
+                "FLASK_APP": "app/main.py",
                 "FLASK_DEBUG": "1"
             },
             "args": [

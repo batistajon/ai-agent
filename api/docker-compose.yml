@@ -1,15 +1,17 @@
 version: '3'
 
 services:
-  flask:
+  api:
     build:
       context: .
     volumes:
       - ./app:/app
+    environment:
+      - PYTHONPATH=/app
     ports:
       - '5000:5000'
-      - '5001:5001'
-    command: python /app/app.py
+    networks:
+      - assitant
 
   chromadb:
     image: chromadb/chroma:0.5.1.dev13
@@ -17,6 +19,8 @@ services:
       - ./chroma:/chroma/chroma
     ports:
       - '8000:8000'
+    networks:
+      - assitant
 
   ollama:
     image: ollama/ollama
@@ -24,3 +28,9 @@ services:
       - ./ollama:/root/.ollama
     ports:
       - '11434:11434'
+    networks:
+      - assitant
+
+networks:
+  assitant:
+    driver: bridge
