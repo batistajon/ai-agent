@@ -95,6 +95,7 @@ def ask_ai(
     response = {"answer": llm_response}
     return response
 
+
 @app.post("/pdf")
 async def create_upload_pdf(
     request: Request,

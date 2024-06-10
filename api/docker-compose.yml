@@ -10,10 +10,9 @@ services:
       - PYTHONPATH=/app
     ports:
       - '5000:5000'
-    networks:
-      - assitant
+    network_mode: host
 
-  chromadb:
+  chromadb_container:
     image: chromadb/chroma:0.5.1.dev13
     volumes:
       - ./chroma:/chroma/chroma
