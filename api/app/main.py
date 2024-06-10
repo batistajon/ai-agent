@@ -17,6 +17,7 @@ from langchain_core.caches import BaseCache
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from langchain_community.chat_models import ChatOllama
+from langchain_community.chat_models import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PDFPlumberLoader
@@ -25,9 +26,8 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
 from langchain.schema.runnable import RunnablePassthrough
 
-from models.collection import Collection
-
 load_dotenv()
+print("OPENAI_API_KEY")
 
 app = FastAPI(title="Assistente CAQO")
 
@@ -57,7 +57,9 @@ admin_client = chromadb.AdminClient(Settings(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
 
-cached_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
+ollama_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
+openai_llm = ChatOpenAI(model="gpt-4-1106-preview")
+
 embedding = FastEmbedEmbeddings()
 
 def get_or_create_tenant_for_user(client):
@@ -85,12 +87,20 @@ def index():
 @app.post("/ai")
 def ask_ai(
     request: Request,
-    token: str
+    token: str,
+    llm: str
 ):
     logging.info("Post /ai called")
     json_content = request.json
     query = json_content.get("query")
     logging.info(f"query: {query}")
+
+    cached_llm = ""
+    if request.llm == "openai":
+        cached_llm = openai_llm
+    else:
+        cached_llm = ollama_llm
+
     llm_response = cached_llm.invoke(query)
     response = {"answer": llm_response}
     return response
@@ -171,6 +181,7 @@ async def create_upload_pdf(
 
 class AskPDFRequest(BaseModel):
     token: str
+    llm: str = "ollama"
     client: str
     category: str
     subject: str
@@ -218,10 +229,10 @@ async def ask_pdf(
         },
     )
 
-    logging.info("Retrieved Documents:")
+    logging.info(f"Retrieved Documents: {retriever}")
     relevant_documents = retriever.get_relevant_documents(request.query)
 
-    logging.info("Relevant Documents:")
+    logging.info(f"Relevant Documents: {relevant_documents}")
     references = []
     for doc in relevant_documents:
         reference = {"filename": doc.metadata.get('source'), "content": doc.page_content}
@@ -229,6 +240,12 @@ async def ask_pdf(
 
     prompt = PromptTemplate(template=request.prompt, input_variables=['question'])
     logging.info("Creating chain")
+    cached_llm = ""
+    if request.llm == "openai":
+        cached_llm = openai_llm
+    else:
+        cached_llm = ollama_llm
+
     llm_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt

@@ -5,36 +5,33 @@ import time
 import json
 import requests
 
+st.set_page_config(
+    page_title="CAQO - Assistente IA",
+    page_icon="🤖",
+    layout="centered",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.extremelycoolapp.com/help',
+        'Report a bug': "https://www.extremelycoolapp.com/bug",
+        'About': "# This is a header. This is an *extremely* cool app!"
+    }
+)
+st.title("🤖 Assistente CAQO")
 
-# Streamed response emulator
-def response_generator(bot_response):
-    for word in bot_response.split():
-        yield word + " "
-        time.sleep(0.05)
-
-
-st.title("Assistente CAQO")
-
-# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
     logging.info("Post /ai called")
 
-# Display chat messages from history on app rerun
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Accept user input
-if prompt := st.chat_input("What is up?"):
+if prompt := st.chat_input("Em que posso te ajudar?"):
     logging.info(prompt)
-    # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Display user message in chat message container
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Display assistant response in chat message container
     with st.chat_message("assistant"):
         response_prompt = """
             Use the following pieces of context to answer the question at the end.
@@ -50,6 +47,7 @@ if prompt := st.chat_input("What is up?"):
 
         params = {
             "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
+            "llm": "openai",
             "client": "caqo",
             "category": "recursos",
             "subject": "deploy",
@@ -72,10 +70,16 @@ if prompt := st.chat_input("What is up?"):
             res = requests.post(url=url, data=json_data, headers=headers)
             response_text = res.text
             response_data = json.loads(response_text)
-            answer = response_data.get("answer", "")
+            answer = response_data.get("answer")
         except Exception as e:
             response_text = f"Error: {str(e)}"
 
-        response = st.write_stream(response_generator(answer))
+        print(answer)
+        response = ""
+        response_md = st.empty()
+        for chunk in answer:
+            response += chunk
+            time.sleep(0.05)
+            response_md.markdown(response)
 
     st.session_state.messages.append({"role": "assistant", "content": response})
