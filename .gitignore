@@ -1,3 +1,6 @@
 .vscode/
 api/chroma/
-
+api/app/documents/
+api/db
+api/ollama
+poc/ollama

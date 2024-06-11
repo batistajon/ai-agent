@@ -1,8 +1,0 @@
-Virtual Env
-```
-python3 -m venv venv
-```
-Activate venv
-```
-source bin/activate
-```

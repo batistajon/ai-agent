@@ -1,8 +1,8 @@
 from langchain.prompts import PromptTemplate
 from langchain.document_loaders import TextLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_community.chat_models import ChatOllama
 from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.vectorstores import chroma
@@ -12,10 +12,7 @@ from langchain_community.document_loaders import PyPDFLoader
 
 import chainlit as cl
 import tiktoken
-import openai
 import os
-
-openai.api_key = os.getenv('OPENAI_API_KEY')
 
 enc = tiktoken.get_encoding("cl100k_base")
 
@@ -25,7 +22,7 @@ def length_function(text: str) -> int:
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
-llm = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
+llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 vector_db = chroma.Chroma()
 vector_db.delete_collection()
 retriever = None
@@ -74,7 +71,7 @@ def main():
 
     chunks = text_splitter.split_documents(documents=documents)
 
-    embeddings = OpenAIEmbeddings()
+    embeddings = FastEmbedEmbeddings()
     vector_docs = vector_db.from_documents(
         documents=chunks,
         embedding=embeddings
