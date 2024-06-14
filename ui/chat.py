@@ -20,13 +20,57 @@ if llm_choice == "Premium":
     llm = "openai"
 else:
     llm = "ollama"
+
 uploaded_files = st.sidebar.file_uploader("Suba um PDF para fazer perguntas", accept_multiple_files=True)
 
 def embed_files():
     for uploaded_file in uploaded_files:
-        st.markdown("file uploaded")
+        params = {
+            "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
+            "client": "caqo",
+            "category": "recursos",
+            "subject": "deploy",
+            "chunk_size": doc_size_value[0],
+            "chunk_overlap": doc_size_value[1]
+        }
+
+        url = f"http://localhost:5000/{doc_ext_value}"
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        print(params)
+        print(url)
 
 if uploaded_files:
+    tenant = st.sidebar.text_input("Qual a Categoria do documento?", help="Organize seu assistente por Categorias")
+    tenant = st.sidebar.text_input("Especifique o assunto do documento.", help="Escolha um assunto para deixar o assistente mais eficiente.")
+
+    doc_ext_options = ["PDF", "Word", "CSV", "URL"]
+    doc_ext_mapping = {
+        "PDF": "pdf",
+        "Word": "text",
+        "CSV": "csv",
+        "URL": "url"
+    }
+
+    doc_size_options = [
+        "Menos de 10 Paginas",
+        "De 11 a 50 paginas",
+        "De 51 a 100 paginas",
+        "Mais de 100"
+    ]
+    doc_size_mapping = {
+        "Menos de 10 Paginas": (150, 20),
+        "De 11 a 50 paginas": (300, 40),
+        "De 51 a 100 paginas": (450, 80),
+        "Mais de 100": (1024, 200)
+    }
+    selected_doc_ext = st.sidebar.selectbox("Escolha o Tipo do Arquivo", doc_ext_options)
+    selected_doc_size = st.sidebar.selectbox("Qual o Tamanho do Arquivo em Paginas", doc_size_options)
+
+    doc_ext_value = doc_ext_mapping[selected_doc_ext]
+    doc_size_value = doc_size_mapping[selected_doc_size]
     st.sidebar.button(label="Treinar IA", on_click=embed_files)
 
 
