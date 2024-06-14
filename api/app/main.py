@@ -17,7 +17,7 @@ from langchain_core.caches import BaseCache
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from langchain_community.chat_models import ChatOllama
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PDFPlumberLoader

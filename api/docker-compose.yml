@@ -5,6 +5,7 @@ services:
     build:
       context: .
     volumes:
+      - ./app/venv:/app/venv
       - ./app:/app
     environment:
       - PYTHONPATH=/app
