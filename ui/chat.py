@@ -14,22 +14,22 @@ st.set_page_config(
 st.title("🤖 Assistente CAQO")
 
 st.sidebar.header("Customize seu assistente")
-llm_choice = st.sidebar.selectbox("Escolha a LLM", {"Premium", "Free"})
+llm_choice = st.sidebar.selectbox("Escolha a LLM", {"Premium", "Free"}, help="")
 
 if llm_choice == "Premium":
     llm = "openai"
 else:
     llm = "ollama"
 
-uploaded_files = st.sidebar.file_uploader("Suba um PDF para fazer perguntas", accept_multiple_files=True)
+uploaded_files = st.sidebar.file_uploader("Suba um PDF para fazer perguntas", accept_multiple_files=True, help="A IA ira te responder sobre o conteudo dos aqruivos")
 
 def embed_files():
     for uploaded_file in uploaded_files:
         params = {
             "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
             "client": "caqo",
-            "category": "recursos",
-            "subject": "deploy",
+            "category": "analise_de_dados",
+            "subject": "demografia",
             "chunk_size": doc_size_value[0],
             "chunk_overlap": doc_size_value[1]
         }
@@ -94,7 +94,7 @@ if prompt := st.chat_input("Em que posso te ajudar?"):
             Use the following pieces of context to answer the question at the end.
             If you don't know the answer, just say that you don't know, don't try to make up an answer.
             You are a Senior DevOps Engineer with large experience deploying all kinds of applications.
-            Please explain to me in detail as if you are teaching a junior developer.
+            Please explain to me in detail as if you are teaching a junior developer. Important that your answer be in portuguese
 
             {context}
 
@@ -106,8 +106,8 @@ if prompt := st.chat_input("Em que posso te ajudar?"):
             "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
             "llm": llm,
             "client": "caqo",
-            "category": "recursos",
-            "subject": "deploy",
+            "category": "analise_de_dados",
+            "subject": "demografia",
             "query": prompt,
             "prompt": response_prompt,
         }

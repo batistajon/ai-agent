@@ -88,7 +88,8 @@ def index():
 def ask_ai(
     request: Request,
     token: str,
-    llm: str
+    llm: str,
+    query: str
 ):
     logging.info("Post /ai called")
     json_content = request.json
