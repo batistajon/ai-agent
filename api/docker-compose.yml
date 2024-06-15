@@ -19,8 +19,7 @@ services:
       - ./chroma:/chroma/chroma
     ports:
       - '8000:8000'
-    networks:
-      - assitant
+    network_mode: host
 
   ollama:
     image: ollama/ollama
@@ -28,9 +27,5 @@ services:
       - ./ollama:/root/.ollama
     ports:
       - '11434:11434'
-    networks:
-      - assitant
-
-networks:
-  assitant:
-    driver: bridge
+    command: "ollama pull llama3"
+    network_mode: host
