@@ -1,17 +1,17 @@
 version: '3'
 
 services:
-  api:
-    build:
-      context: .
-    volumes:
-      - ./app/venv:/app/venv
-      - ./app:/app
-    environment:
-      - PYTHONPATH=/app
-    ports:
-      - '5000:5000'
-    network_mode: host
+  #  api:
+  #    build:
+  #      context: .
+  #    volumes:
+  #      - ./app/venv:/app/venv
+  #      - ./app:/app
+  #    environment:
+  #      - PYTHONPATH=/app
+  #    ports:
+  #      - '5000:5000'
+  #    network_mode: host
 
   chromadb_container:
     image: chromadb/chroma:0.5.1.dev13
@@ -22,14 +22,14 @@ services:
     networks:
       - assitant
 
-  ollama:
-    image: ollama/ollama
-    volumes:
-      - ./ollama:/root/.ollama
-    ports:
-      - '11434:11434'
-    networks:
-      - assitant
+  #  ollama:
+  #    image: ollama/ollama
+  #    volumes:
+  #      - ./ollama:/root/.ollama
+  #    ports:
+  #      - '11434:11434'
+  #    networks:
+  #      - assitant
 
 networks:
   assitant:

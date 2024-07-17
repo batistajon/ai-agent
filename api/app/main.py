@@ -3,8 +3,9 @@ import logging
 import sys
 import json
 import chromadb
+import uvicorn
 
-from helpers import length_function, format_docs
+from helpers.common import length_function, format_docs
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -50,17 +51,19 @@ app.add_middleware(
 )
 
 admin_client = chromadb.AdminClient(Settings(
-  chroma_api_impl="chromadb.api.fastapi.FastAPI",
-  chroma_server_host="localhost",
-  chroma_server_http_port="8000",
+    chroma_api_impl="chromadb.api.fastapi.FastAPI",
+    chroma_server_host="localhost",
+    chroma_server_http_port="8000",
 ))
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
 
 ollama_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 openai_llm = ChatOpenAI(model="gpt-4-1106-preview")
 
 embedding = FastEmbedEmbeddings()
+
 
 def get_or_create_tenant_for_user(client):
     tenant_id = f"tenant_{client}"
@@ -70,6 +73,7 @@ def get_or_create_tenant_for_user(client):
         admin_client.create_tenant(tenant_id)
     return tenant_id
 
+
 def get_or_create_db_for_user(category, tenant):
     database = f"db_{category}"
     try:
@@ -78,11 +82,13 @@ def get_or_create_db_for_user(category, tenant):
         admin_client.create_database(database, tenant)
     return database
 
+
 @app.get("/")
 def index():
     logging.info("Assistente disponivel")
     response = {"message": "assistente disponivel"}
     return response
+
 
 @app.post("/ai")
 def ask_ai(
@@ -180,6 +186,7 @@ async def create_upload_pdf(
 
     return response
 
+
 class AskPDFRequest(BaseModel):
     token: str
     llm: str = "ollama"
@@ -188,6 +195,7 @@ class AskPDFRequest(BaseModel):
     subject: str
     query: str
     prompt: str
+
 
 @app.post("/ask-pdf")
 async def ask_pdf(
@@ -206,7 +214,8 @@ async def ask_pdf(
 
     logging.info(f"Loading Vector Store")
     tenant = admin_client.get_tenant(f"tenant_{request.client}")
-    database = admin_client.get_database(f"db_{request.category}", tenant['name'])
+    database = admin_client.get_database(
+        f"db_{request.category}", tenant['name'])
 
     chroma_client = chromadb.HttpClient(
         host="localhost",
@@ -220,7 +229,6 @@ async def ask_pdf(
         collection_name=request.subject,
         persist_directory="/chroma/chroma"
     )
-
 
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
@@ -236,10 +244,12 @@ async def ask_pdf(
     logging.info(f"Relevant Documents: {relevant_documents}")
     references = []
     for doc in relevant_documents:
-        reference = {"filename": doc.metadata.get('source'), "content": doc.page_content}
+        reference = {"filename": doc.metadata.get(
+            'source'), "content": doc.page_content}
         references.append(reference)
 
-    prompt = PromptTemplate(template=request.prompt, input_variables=['question'])
+    prompt = PromptTemplate(template=request.prompt,
+                            input_variables=['question'])
     logging.info("Creating chain")
     cached_llm = ""
     if request.llm == "openai":
@@ -263,3 +273,6 @@ async def ask_pdf(
     }
 
     return response_answer
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
