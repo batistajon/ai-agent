@@ -1,11 +1,10 @@
 import os
-import logging
-import sys
 import json
 import chromadb
 import uvicorn
 
 from helpers.common import length_function, format_docs
+from services.logger import Logger
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -14,21 +13,18 @@ from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from langchain_core.caches import BaseCache
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PDFPlumberLoader
 
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
 from langchain.schema.runnable import RunnablePassthrough
 
-load_dotenv()
-print("OPENAI_API_KEY")
+load_dotenv(".env")
 
 app = FastAPI(title="Assistente CAQO")
 
@@ -56,8 +52,10 @@ admin_client = chromadb.AdminClient(Settings(
     chroma_server_http_port="8000",
 ))
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
+logger = Logger().logger
+
+# Redirect to routes ----------
+# Everything underneath this lines should be abstacted
 
 ollama_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 openai_llm = ChatOpenAI(model="gpt-4-1106-preview")
