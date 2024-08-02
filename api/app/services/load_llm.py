@@ -10,6 +10,6 @@ class LoadLLM:
 
     def __init__(self, llm: str):
         if llm in self.llm_map:
-            return llm
+            return self.llm_map.get(llm)
 
         return False

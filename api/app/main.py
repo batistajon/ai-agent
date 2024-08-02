@@ -3,8 +3,8 @@ import json
 import chromadb
 import uvicorn
 
-from helpers.common import length_function, format_docs
-from services.logger import Logger
+from .helpers.common import length_function, format_docs
+from .services.logger import Logger
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -83,7 +83,7 @@ def get_or_create_db_for_user(category, tenant):
 
 @app.get("/")
 def index():
-    logging.info("Assistente disponivel")
+    logger.info("Assistente disponivel")
     response = {"message": "assistente disponivel"}
     return response
 
@@ -95,10 +95,10 @@ def ask_ai(
     llm: str,
     query: str
 ):
-    logging.info("Post /ai called")
+    logger.info("Post /ai called")
     json_content = request.json
     query = json_content.get("query")
-    logging.info(f"query: {query}")
+    logger.info(f"query: {query}")
 
     cached_llm = ""
     if request.llm == "openai":
@@ -129,10 +129,10 @@ async def create_upload_pdf(
         if clients.get("token") != token:
             raise Exception("Invalid token")
 
-    logging.info("Post /pdf called")
+    logger.info("Post /pdf called")
     file_name = file.filename
     file_content = await file.read()
-    logging.info(f"filename: {file_name}")
+    logger.info(f"filename: {file_name}")
 
     os.makedirs("documents", exist_ok=True)
     tmp_file_name = f"{subject}_{file_name}"
@@ -149,10 +149,10 @@ async def create_upload_pdf(
     )
     loader = PDFPlumberLoader(tmp_file_path)
     docs = loader.load_and_split()
-    logging.info(f"docs: {len(docs)}")
+    logger.info(f"docs: {len(docs)}")
 
     chunks = text_splitter.split_documents(docs)
-    logging.info(f"chunks len: {len(chunks)}")
+    logger.info(f"chunks len: {len(chunks)}")
 
     tenant = get_or_create_tenant_for_user(client)
     database = get_or_create_db_for_user(category, tenant)
@@ -171,7 +171,7 @@ async def create_upload_pdf(
         collection_name=subject,
         persist_directory="/chroma/chroma"
     )
-    logging.info("Vector store created successfully.")
+    logger.info("Vector store created successfully.")
 
     os.remove(tmp_file_path)
 
@@ -199,7 +199,7 @@ class AskPDFRequest(BaseModel):
 async def ask_pdf(
     request: AskPDFRequest
 ):
-    logging.info("Post /askPDFPost called")
+    logger.info("Post /askPDFPost called")
     with open("token.json", 'r') as token_json:
         clients = json.load(token_json)
         if clients.get("client") != request.client:
@@ -207,10 +207,10 @@ async def ask_pdf(
         if clients.get("token") != request.token:
             raise Exception("Invalid token")
 
-    logging.info(f"query: {request.query}")
-    logging.info(f"collection: {request.subject}")
+    logger.info(f"query: {request.query}")
+    logger.info(f"collection: {request.subject}")
 
-    logging.info(f"Loading Vector Store")
+    logger.info(f"Loading Vector Store")
     tenant = admin_client.get_tenant(f"tenant_{request.client}")
     database = admin_client.get_database(
         f"db_{request.category}", tenant['name'])
@@ -236,10 +236,10 @@ async def ask_pdf(
         },
     )
 
-    logging.info(f"Retrieved Documents: {retriever}")
+    logger.info(f"Retrieved Documents: {retriever}")
     relevant_documents = retriever.get_relevant_documents(request.query)
 
-    logging.info(f"Relevant Documents: {relevant_documents}")
+    logger.info(f"Relevant Documents: {relevant_documents}")
     references = []
     for doc in relevant_documents:
         reference = {"filename": doc.metadata.get(
@@ -248,7 +248,7 @@ async def ask_pdf(
 
     prompt = PromptTemplate(template=request.prompt,
                             input_variables=['question'])
-    logging.info("Creating chain")
+    logger.info("Creating chain")
     cached_llm = ""
     if request.llm == "openai":
         cached_llm = openai_llm
@@ -263,7 +263,7 @@ async def ask_pdf(
     )
     result = await llm_chain.ainvoke(request.query)
 
-    logging.info(result)
+    logger.info(result)
 
     response_answer = {
         "answer": result,
@@ -271,6 +271,3 @@ async def ask_pdf(
     }
 
     return response_answer
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
