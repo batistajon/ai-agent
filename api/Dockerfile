@@ -1,16 +1,15 @@
 FROM python:3.11-slim
 
 RUN apt update && \
-    apt install curl gcc -y
+  apt install curl gcc -y
 
-COPY requirements.txt requirements.txt
-COPY app /app
+COPY . /assistente
 
 RUN python3 -m venv venv && \
-. venv/bin/activate
+  . venv/bin/activate
 
 RUN pip install --upgrade pip && \
-pip install -r requirements.txt
+  pip install -r requirements.txt
 
 WORKDIR /app
 

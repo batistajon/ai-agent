@@ -1,10 +1,10 @@
 import os
-import logging
-import sys
 import json
 import chromadb
+import uvicorn
 
-from helpers import length_function, format_docs
+from .helpers.common import length_function, format_docs
+from .services.logger import Logger
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -13,21 +13,18 @@ from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from langchain_core.caches import BaseCache
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.document_loaders import PDFPlumberLoader
 
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
 from langchain.schema.runnable import RunnablePassthrough
 
-load_dotenv()
-print("OPENAI_API_KEY")
+load_dotenv(".env")
 
 app = FastAPI(title="Assistente CAQO")
 
@@ -50,17 +47,21 @@ app.add_middleware(
 )
 
 admin_client = chromadb.AdminClient(Settings(
-  chroma_api_impl="chromadb.api.fastapi.FastAPI",
-  chroma_server_host="localhost",
-  chroma_server_http_port="8000",
+    chroma_api_impl="chromadb.api.fastapi.FastAPI",
+    chroma_server_host="localhost",
+    chroma_server_http_port="8000",
 ))
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s: [%(levelname)s] %(message)s', stream=sys.stdout)
+logger = Logger().logger
+
+# Redirect to routes ----------
+# Everything underneath this lines should be abstacted
 
 ollama_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
 openai_llm = ChatOpenAI(model="gpt-4-1106-preview")
 
 embedding = FastEmbedEmbeddings()
+
 
 def get_or_create_tenant_for_user(client):
     tenant_id = f"tenant_{client}"
@@ -70,6 +71,7 @@ def get_or_create_tenant_for_user(client):
         admin_client.create_tenant(tenant_id)
     return tenant_id
 
+
 def get_or_create_db_for_user(category, tenant):
     database = f"db_{category}"
     try:
@@ -78,11 +80,13 @@ def get_or_create_db_for_user(category, tenant):
         admin_client.create_database(database, tenant)
     return database
 
+
 @app.get("/")
 def index():
-    logging.info("Assistente disponivel")
+    logger.info("Assistente disponivel")
     response = {"message": "assistente disponivel"}
     return response
+
 
 @app.post("/ai")
 def ask_ai(
@@ -91,10 +95,10 @@ def ask_ai(
     llm: str,
     query: str
 ):
-    logging.info("Post /ai called")
+    logger.info("Post /ai called")
     json_content = request.json
     query = json_content.get("query")
-    logging.info(f"query: {query}")
+    logger.info(f"query: {query}")
 
     cached_llm = ""
     if request.llm == "openai":
@@ -125,10 +129,10 @@ async def create_upload_pdf(
         if clients.get("token") != token:
             raise Exception("Invalid token")
 
-    logging.info("Post /pdf called")
+    logger.info("Post /pdf called")
     file_name = file.filename
     file_content = await file.read()
-    logging.info(f"filename: {file_name}")
+    logger.info(f"filename: {file_name}")
 
     os.makedirs("documents", exist_ok=True)
     tmp_file_name = f"{subject}_{file_name}"
@@ -145,10 +149,10 @@ async def create_upload_pdf(
     )
     loader = PDFPlumberLoader(tmp_file_path)
     docs = loader.load_and_split()
-    logging.info(f"docs: {len(docs)}")
+    logger.info(f"docs: {len(docs)}")
 
     chunks = text_splitter.split_documents(docs)
-    logging.info(f"chunks len: {len(chunks)}")
+    logger.info(f"chunks len: {len(chunks)}")
 
     tenant = get_or_create_tenant_for_user(client)
     database = get_or_create_db_for_user(category, tenant)
@@ -167,7 +171,7 @@ async def create_upload_pdf(
         collection_name=subject,
         persist_directory="/chroma/chroma"
     )
-    logging.info("Vector store created successfully.")
+    logger.info("Vector store created successfully.")
 
     os.remove(tmp_file_path)
 
@@ -180,6 +184,7 @@ async def create_upload_pdf(
 
     return response
 
+
 class AskPDFRequest(BaseModel):
     token: str
     llm: str = "ollama"
@@ -189,11 +194,12 @@ class AskPDFRequest(BaseModel):
     query: str
     prompt: str
 
+
 @app.post("/ask-pdf")
 async def ask_pdf(
     request: AskPDFRequest
 ):
-    logging.info("Post /askPDFPost called")
+    logger.info("Post /askPDFPost called")
     with open("token.json", 'r') as token_json:
         clients = json.load(token_json)
         if clients.get("client") != request.client:
@@ -201,12 +207,13 @@ async def ask_pdf(
         if clients.get("token") != request.token:
             raise Exception("Invalid token")
 
-    logging.info(f"query: {request.query}")
-    logging.info(f"collection: {request.subject}")
+    logger.info(f"query: {request.query}")
+    logger.info(f"collection: {request.subject}")
 
-    logging.info(f"Loading Vector Store")
+    logger.info(f"Loading Vector Store")
     tenant = admin_client.get_tenant(f"tenant_{request.client}")
-    database = admin_client.get_database(f"db_{request.category}", tenant['name'])
+    database = admin_client.get_database(
+        f"db_{request.category}", tenant['name'])
 
     chroma_client = chromadb.HttpClient(
         host="localhost",
@@ -221,7 +228,6 @@ async def ask_pdf(
         persist_directory="/chroma/chroma"
     )
 
-
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
         search_kwargs={
@@ -230,17 +236,19 @@ async def ask_pdf(
         },
     )
 
-    logging.info(f"Retrieved Documents: {retriever}")
+    logger.info(f"Retrieved Documents: {retriever}")
     relevant_documents = retriever.get_relevant_documents(request.query)
 
-    logging.info(f"Relevant Documents: {relevant_documents}")
+    logger.info(f"Relevant Documents: {relevant_documents}")
     references = []
     for doc in relevant_documents:
-        reference = {"filename": doc.metadata.get('source'), "content": doc.page_content}
+        reference = {"filename": doc.metadata.get(
+            'source'), "content": doc.page_content}
         references.append(reference)
 
-    prompt = PromptTemplate(template=request.prompt, input_variables=['question'])
-    logging.info("Creating chain")
+    prompt = PromptTemplate(template=request.prompt,
+                            input_variables=['question'])
+    logger.info("Creating chain")
     cached_llm = ""
     if request.llm == "openai":
         cached_llm = openai_llm
@@ -255,7 +263,7 @@ async def ask_pdf(
     )
     result = await llm_chain.ainvoke(request.query)
 
-    logging.info(result)
+    logger.info(result)
 
     response_answer = {
         "answer": result,
