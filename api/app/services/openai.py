@@ -12,7 +12,7 @@ class OpenAI:
     def _initializeChat():
         try:
             openai_llm = ChatOpenAI(
-               model="gpt-4-1106-preview"
+               model="gpt-4o"
             )
 
             return openai_llm

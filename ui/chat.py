@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import logging
 import random
 import time
@@ -9,42 +10,101 @@ import requests
 st.set_page_config(
     page_title="CAQO - Assistente IA",
     page_icon="🤖",
-    layout="centered"
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.extremelycoolapp.com/help',
+        'Report a bug': "https://www.extremelycoolapp.com/bug",
+        'About': "# Assistente da CAQO!"
+    }
 )
+
 st.title("🤖 Assistente CAQO")
 
 st.sidebar.header("Customize seu assistente")
-llm_choice = st.sidebar.selectbox("Escolha a LLM", {"Premium", "Free"}, help="")
 
-if llm_choice == "Premium":
-    llm = "openai"
-else:
-    llm = "ollama"
+def show_alert():
+    st.warning('Este é um aviso de teste!')
+    st.error('Este é um erro de teste!')
+    st.success('Esta é uma confirmação de teste!')
 
-uploaded_files = st.sidebar.file_uploader("Suba um PDF para fazer perguntas", accept_multiple_files=True, help="A IA ira te responder sobre o conteudo dos aqruivos")
+import streamlit as st
+
+css='''
+<style>
+[data-testid="stFileUploaderDropzone"] div div::before {color:green; content:"Clique aqui ou Arraste os arquivos"}
+[data-testid="stFileUploaderDropzone"] div div span{display:none;}
+[data-testid="stFileUploaderDropzone"] div div::after {color:green; font-size: .8em; content:"Até 10MB por arquivo"}
+[data-testid="stFileUploaderDropzone"] div div small{display:none;}
+section[data-testid="stFileUploaderDropzone"] > button {
+display: none;
+}
+
+</style>
+'''
+
+st.markdown(css, unsafe_allow_html=True)
+
+with st.sidebar.expander("Parâmetros"):
+    category = st.text_input("Categoria", help="Organize seu assistente por Categorias")
+    subject = st.text_input("Assunto", value="assunto_teste", help="Escolha um assunto para deixar o assistente mais eficiente.")
+    llm_choice = st.selectbox("Escolha a LLM", ["Premium", "Free"], help="")
+
+with st.sidebar.expander("Importar"):
+    uploaded_files = st.file_uploader("Suba um PDF para fazer perguntas", accept_multiple_files=True, help="A IA irá te responder sobre o conteúdo dos arquivos")
+    if uploaded_files:
+        st.write("Arquivos carregados!")
+
+with st.sidebar.expander("Não mexer"):
+    token = st.text_input("Token (não mexer)", help="Token de autenticação para a API.", value="lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj")
+    client = st.text_input("Cliente", value="caqo", help="Identificador do cliente usando a API.")
+    if st.button('Mostrar alerta'):
+        show_alert()
+
 
 def embed_files():
     for uploaded_file in uploaded_files:
+        # Preparando o arquivo para ser enviado
+        files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+        
+        # Preparando parâmetros de consulta
         params = {
-            "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
-            "client": "caqo",
-            "category": "analise_de_dados",
-            "subject": "demografia",
-            "chunk_size": doc_size_value[0],
-            "chunk_overlap": doc_size_value[1]
+            "token": token,
+            "client": client,
+            "category": category,
+            "subject": subject,
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap
         }
+        
+        # URL para a requisição incluindo parâmetros de consulta
+        url = "http://localhost:5000/pdf"
+        
+        # Realizando o pedido POST com parâmetros de consulta
+        response = requests.post(url, params=params, files=files)
+        
+        # Verificando a resposta do servidor
+        if response.status_code == 200:
+            st.success("Arquivo enviado e processado com sucesso!")
+            st.json(response.json())  # Exibindo a resposta JSON
+        else:
+            st.error("Falha ao enviar arquivo: " + response.text)
+            print(response.status_code, response.text)  # Para debug
 
-        url = f"http://localhost:5000/{doc_ext_value}"
-        headers = {
-            "Content-Type": "application/json"
-        }
-
-        print(params)
-        print(url)
 
 if uploaded_files:
-    tenant = st.sidebar.text_input("Qual a Categoria do documento?", help="Organize seu assistente por Categorias")
-    tenant = st.sidebar.text_input("Especifique o assunto do documento.", help="Escolha um assunto para deixar o assistente mais eficiente.")
+    token = st.sidebar.text_input("Token (não mexer)", help="Token de autenticação para a API.", value="lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj")
+    client = st.sidebar.text_input("Cliente", value="caqo", help="Identificador do cliente usando a API.")
+    category = st.sidebar.text_input("Categoria", help="Organize seu assistente por Categorias")
+    subject = st.sidebar.text_input("Assunto", value="assunto_teste", help="Escolha um assunto para deixar o assistente mais eficiente.")
+    chunk_size = st.sidebar.number_input("Defina o tamanho do chunk", min_value=100, max_value=2048, value=800, step=50, help="Define o tamanho de cada pedaço do documento para análise.")
+    chunk_overlap = st.sidebar.number_input("Defina a sobreposição do chunk", min_value=0, max_value=500, value=150, step=10, help="Define a sobreposição entre os chunks para evitar a perda de contexto.")
+    llm_choice = st.sidebar.selectbox("Escolha a LLM", {"Premium", "Free"}, help="")
+    if llm_choice == "Premium":
+        llm = "openai"
+    else:
+        llm = "ollama"
+
 
     doc_ext_options = ["PDF", "Word", "CSV", "URL"]
     doc_ext_mapping = {
@@ -82,7 +142,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Em que posso te ajudar?"):
+if prompt := st.chat_input("Como posso ajudar?"):
     logging.info(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -103,11 +163,11 @@ if prompt := st.chat_input("Em que posso te ajudar?"):
         """
 
         params = {
-            "token": "lskdjfhlasdhflaskjdhflaksdjhlfkjasdlkfjahlsdj",
+            "token": token,
             "llm": llm,
-            "client": "caqo",
-            "category": "analise_de_dados",
-            "subject": "demografia",
+            "client": client,
+            "category": category,
+            "subject": subject,
             "query": prompt,
             "prompt": response_prompt,
         }

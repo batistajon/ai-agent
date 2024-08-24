@@ -1,4 +1,4 @@
-version: '3'
+version: '3.9'
 
 services:
   api:
@@ -21,11 +21,11 @@ services:
       - '8000:8000'
     network_mode: host
 
-  ollama:
-    image: ollama/ollama
-    volumes:
-      - ./ollama:/root/.ollama
-    ports:
-      - '11434:11434'
-    command: "ollama pull llama3"
-    network_mode: host
+  #ollama:
+    #image: ollama/ollama
+    #volumes:
+      # - ./ollama:/root/.ollama
+    #ports:
+      #- '11434:11434'
+    #command: "ollama pull llama3"
+    #network_mode: host

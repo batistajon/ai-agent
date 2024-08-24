@@ -1,10 +1,15 @@
 import os
 import json
+
+from fastapi import HTTPException
 import chromadb
 import uvicorn
 
-from .helpers.common import length_function, format_docs
-from .services.logger import Logger
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+from app.helpers.common import length_function, format_docs
+from app.services.logger import Logger
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -23,6 +28,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
 from langchain.schema.runnable import RunnablePassthrough
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 load_dotenv(".env")
 
@@ -58,7 +66,9 @@ logger = Logger().logger
 # Everything underneath this lines should be abstacted
 
 ollama_llm = ChatOllama(model="llama3", base_url="http://localhost:11434")
-openai_llm = ChatOpenAI(model="gpt-4-1106-preview")
+# openai_llm = ChatOpenAI(model="gpt-4o")
+openai_llm = ChatOpenAI(model="text-ada-002")
+
 
 embedding = FastEmbedEmbeddings()
 
@@ -118,16 +128,16 @@ async def create_upload_pdf(
     client: str,
     category: str,
     subject: str,
-    chunk_size: int = 800,
-    chunk_overlap: int = 150,
+    chunk_size: int = 1024,
+    chunk_overlap: int = 450,
     file: UploadFile = File(...)
 ):
     with open("token.json", 'r') as token_json:
         clients = json.load(token_json)
         if clients.get("client") != client:
-            raise Exception("Invalid client")
+            raise Exception("Cliente inválido!")
         if clients.get("token") != token:
-            raise Exception("Invalid token")
+            raise Exception("Token inválido!")
 
     logger.info("Post /pdf called")
     file_name = file.filename
@@ -177,7 +187,10 @@ async def create_upload_pdf(
 
     response = {
         "status": "Successfully Uploaded",
-        "filename": file_name,
+        "arquivo": file_name,
+        "cliente": client,
+        "categoria": category,
+        "assunto": subject,
         "doc_len": len(docs),
         "chunks_len": len(chunks)
     }
@@ -203,9 +216,9 @@ async def ask_pdf(
     with open("token.json", 'r') as token_json:
         clients = json.load(token_json)
         if clients.get("client") != request.client:
-            raise Exception("Invalid client")
+            raise Exception("Cliente inválido!")
         if clients.get("token") != request.token:
-            raise Exception("Invalid token")
+            raise Exception("Token inválido!")
 
     logger.info(f"query: {request.query}")
     logger.info(f"collection: {request.subject}")
@@ -230,16 +243,14 @@ async def ask_pdf(
 
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
-        search_kwargs={
-            "k": 20,
-            "score_threshold": 0.1,
-        },
+        search_kwargs={"k": 20, "score_threshold": 0.05},  # Ajustado para 0.05
     )
 
-    logger.info(f"Retrieved Documents: {retriever}")
+
+    logger.info(f"Documentos retornados: {retriever}")
     relevant_documents = retriever.get_relevant_documents(request.query)
 
-    logger.info(f"Relevant Documents: {relevant_documents}")
+    logger.info(f"Documentos relevantes: {relevant_documents}")
     references = []
     for doc in relevant_documents:
         reference = {"filename": doc.metadata.get(
