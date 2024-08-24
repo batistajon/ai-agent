@@ -165,7 +165,7 @@ if prompt := st.chat_input("Como posso ajudar?"):
         params = {
             "token": token,
             "llm": llm,
-            "client": client,
+            "client": "tenant_caqo",
             "category": category,
             "subject": subject,
             "query": prompt,

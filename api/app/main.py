@@ -282,3 +282,63 @@ async def ask_pdf(
     }
 
     return response_answer
+
+######### DAQUI PRA BAIXO SÃO SUGESTÕES!!
+# Função em construção, visando listar, os tenants criados
+@app.get("/list-tenants", summary="Lista todos os tenants e suas collections", description="Retorna uma lista de todos os tenants disponíveis no sistema e suas respectivas collections.")
+def list_tenants():
+    logger.info("Listando todos os tenants e suas collections")
+    try:
+        # Lista todos os tenants disponíveis
+        tenants = admin_client.list_tenants()
+        tenant_collections = {}
+        for tenant in tenants:
+            # Obter o nome do tenant atual
+            tenant_name = tenant['name']
+            # Obter todas as databases para o tenant atual
+            databases = admin_client.list_databases(tenant_name)
+            collections = {}
+            for db in databases:
+                # Obter o nome da database
+                db_name = db['name']
+                # Listar todas as collections para a database
+                db_collections = admin_client.list_collections(tenant_name, db_name)
+                collections[db_name] = db_collections
+            tenant_collections[tenant_name] = collections
+        return {"tenants": tenants, "tenant_collections": tenant_collections}
+    except Exception as e:
+        logger.error(f"Erro ao listar tenants e suas collections: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/list-pdfs")
+async def list_pdfs(tenant_name: str):
+    try:
+        # Conectar ao cliente ChromaDB
+        chroma_client = chromadb.HttpClient(
+            host="localhost",
+            port=8000,
+            tenant="tenant_caqo",
+            database="db_plataforma_networking"  # Ajuste conforme a necessidade
+        )
+        
+        # Obter todas as coleções da database especificada
+        collections = admin_client.list_collections(tenant_name, "db_plataforma_networking")
+        
+        # Filtrar documentos que são PDFs
+        pdf_documents = []
+        for collection in collections:
+            documents = chroma_client.list_documents(collection['name'])
+            for doc in documents:
+                if doc['name'].endswith('.pdf'):  # Verifica se o nome do documento termina com '.pdf'
+                    pdf_documents.append(doc)
+        
+        if not pdf_documents:
+            return {"message": "No PDFs found in the specified tenant."}
+        
+        return {"pdfs": pdf_documents}
+    
+    except Exception as e:
+        logger.error(f"Error listing PDFs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
