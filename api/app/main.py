@@ -3,8 +3,8 @@ import json
 import chromadb
 import uvicorn
 
-from .helpers.common import length_function, format_docs
-from .services.logger import Logger
+from app.helpers.common import length_function, format_docs
+from app.services.logger import Logger
 
 from chromadb import Settings
 from dotenv import load_dotenv
@@ -84,7 +84,7 @@ def get_or_create_db_for_user(category, tenant):
 @app.get("/")
 def index():
     logger.info("Assistente disponivel")
-    response = {"message": "assistente disponivel"}
+    response = {"message": "assistente disponivel!"}
     return response
 
 
