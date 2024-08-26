@@ -3,7 +3,7 @@ FROM python:3.11-slim
 RUN apt update && \
   apt install curl gcc -y
 
-COPY . /assistente
+COPY requirements.txt /assistente/requirements.txt
 
 WORKDIR /assistente
 
@@ -13,8 +13,7 @@ RUN python3 -m venv venv && \
 RUN pip install --upgrade pip && \
   pip install -r requirements.txt
 
-
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/assistente
 
 EXPOSE 5000
 

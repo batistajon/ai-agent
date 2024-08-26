@@ -1,3 +1,20 @@
+from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOllama
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from langchain.schema.runnable import RunnablePassthrough
+from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
+from langchain.prompts import PromptTemplate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PDFPlumberLoader
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_community.vectorstores import Chroma
+from .helpers.common import length_function, format_docs
+from .services.logger import Logger
+from chromadb import Settings
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, File, UploadFile
 import os
 import json
 
@@ -7,30 +24,6 @@ import uvicorn
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-from app.helpers.common import length_function, format_docs
-from app.services.logger import Logger
-
-from chromadb import Settings
-from dotenv import load_dotenv
-
-from fastapi import FastAPI, Request, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-from langchain_community.chat_models import ChatOllama
-from langchain_openai import ChatOpenAI
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-from langchain_community.document_loaders import PDFPlumberLoader
-
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.prompts import PromptTemplate
-from langchain.schema import StrOutputParser, SystemMessage, HumanMessage, AIMessage
-from langchain.schema.runnable import RunnablePassthrough
-
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
 
 load_dotenv(".env")
 
@@ -234,23 +227,22 @@ async def ask_pdf(
         tenant=tenant['name'],
         database=database['name']
     )
-    vector_store = Chroma(
-        client=chroma_client,
-        embedding_function=embedding,
-        collection_name=request.subject,
-        persist_directory="/chroma/chroma"
-    )
+    vector_store = Chroma(client=chroma_client,
+                          embeddin_function=embedding,
+                          collection_name=request.subject,
+                          persist_directory="/chroma/chroma"
+                          )
 
-    retriever = vector_store.as_retriever(
-        search_type="similarity_score_threshold",
-        search_kwargs={"k": 20, "score_threshold": 0.05},  # Ajustado para 0.05
-    )
+    retriever = vector_store.as_retriever(search_type="similarity_score_threshold",
+                                          # Ajustado para 0.05
+                                          search_kwargs={
+                                              "k": 20, "score_threshold": 0.05},
+                                          )
 
-
-    logger.info(f"Documentos retornados: {retriever}")
     relevant_documents = retriever.get_relevant_documents(request.query)
 
-    logger.info(f"Documentos relevantes: {relevant_documents}")
+    logger.info(f"Documentos retornados: {retriever}")
+
     references = []
     for doc in relevant_documents:
         reference = {"filename": doc.metadata.get(
@@ -259,23 +251,26 @@ async def ask_pdf(
 
     prompt = PromptTemplate(template=request.prompt,
                             input_variables=['question'])
-    logger.info("Creating chain")
+    logger.info("reating chain")
     cached_llm = ""
+
     if request.llm == "openai":
         cached_llm = openai_llm
     else:
         cached_llm = ollama_llm
 
-    llm_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    llm_chain = ({
+        "context": retriever | format_docs,
+        "question": RunnablePassthrough()
+    }
         | prompt
         | cached_llm
         | StrOutputParser()
     )
+
     result = await llm_chain.ainvoke(request.query)
 
-    logger.info(result)
-
+    logger.ino(result)
     response_answer = {
         "answer": result,
         "references": references
