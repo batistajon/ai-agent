@@ -26,7 +26,7 @@ from langchain.schema.runnable import RunnablePassthrough
 
 load_dotenv(".env")
 
-app = FastAPI(title="Assistente CAQO")
+app = FastAPI(title="Modular AI Agent")
 
 origins = [
     "http://localhost.com",
