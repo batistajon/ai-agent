@@ -3,7 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 .DS_Store
+# chromadb
 chroma/
+db/
+
+#documents that will be used for RAG
+documents/
 .vscode/
 # C extensions
 *.so
@@ -133,8 +138,3 @@ dmypy.json
 #Pycharm
 .idea/
 
-# chromadb
-db/
-
-#documents that will be used for RAG
-documents/
