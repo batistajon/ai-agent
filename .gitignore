@@ -8,7 +8,7 @@ chroma/
 db/
 
 #documents that will be used for RAG
-documents/
+app/documents/
 .vscode/
 # C extensions
 *.so
