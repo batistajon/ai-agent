@@ -1,6 +1,6 @@
 from app.domain.interfaces.ILLM import ILLM
 from app.domain.interfaces.ILLMFactory import ILLMFactory
-from app.use_cases.deepseek_strategy import DeepSeekStrategy
+from app.patterns.strategies.DeepseekStrategy import DeepSeekStrategy
 
 
 class LLMFactory(ILLMFactory):

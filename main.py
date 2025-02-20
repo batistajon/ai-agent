@@ -1,4 +1,4 @@
-from app.domain.entities.FrameworkSingleton import FrameworkSingleton
+from app.patterns.singleton.FrameworkSingleton import FrameworkSingleton
 from app.frameworks.fastapi.FastAPI import FastAPIFrameworkSingleton
 import uvicorn
 

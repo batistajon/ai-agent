@@ -6,7 +6,6 @@ class ILLM(ABC):
     Encapsulates LLM rules
     """
 
-
     @abstractmethod
     def get_instance(self) -> object:
         """

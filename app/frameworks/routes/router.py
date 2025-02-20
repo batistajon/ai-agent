@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, status
 from starlette.responses import JSONResponse
 
-from app.domain.entities.LLMFactory import LLMFactory
+from app.patterns.factories import LLMFactory
 
 
 router = APIRouter()
@@ -17,18 +17,18 @@ def index() -> JSONResponse:
     return response
 
 
-@router.post("/documents")
-def documents():
+@router.post("/training/pdf")
+def training():
     response = JSONResponse({
         "error": False,
         "status": "live",
-        "message": "Documents have been embedded successfully."
+        "message": "training by PDF"
     }, status_code=201)
 
     return response
 
 
-@router.post("/llms/ask")
+@router.post("/query/llm")
 def askLLM():
     llm_factory = LLMFactory()
     llm_strategy = llm_factory.get_llm_strategy(llm_key="deepseek")
