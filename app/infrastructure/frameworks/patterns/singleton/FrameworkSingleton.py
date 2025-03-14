@@ -1,4 +1,4 @@
-from app.domain.interfaces.IFramework import IFramework
+from app.infrastructure.frameworks.domain.interfaces.IFramework import IFramework
 
 
 class FrameworkSingleton:
