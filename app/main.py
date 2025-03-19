@@ -1,5 +1,5 @@
-from app.infrastructure.frameworks.patterns.singleton import FrameworkSingleton
-from app.infrastructure.frameworks.domain.entities.FastAPI import FastAPIFrameworkSingleton
+from infrastructure.frameworks.patterns.singleton.FrameworkSingleton import FrameworkSingleton
+from infrastructure.frameworks.domain.entities.FastAPI import FastAPIFrameworkSingleton
 import uvicorn
 
 framework = FrameworkSingleton(FastAPIFrameworkSingleton())

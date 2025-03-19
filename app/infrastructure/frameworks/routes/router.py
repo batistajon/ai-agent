@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, status
 from starlette.responses import JSONResponse
 
-from app.patterns.factories import LLMFactory
+from modules.LLM.patterns.factories.LLMFactory import LLMFactory
 
 
 router = APIRouter()

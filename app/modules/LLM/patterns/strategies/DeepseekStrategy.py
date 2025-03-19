@@ -1,4 +1,4 @@
-from app.domain.interfaces.ILLM import ILLM
+from modules.LLM.domain.interfaces.ILLM import ILLM
 from openai import OpenAI
 
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from app.domain.interfaces.ILLM import ILLM
+from modules.LLM.domain.interfaces.ILLM import ILLM
 
 
 class ILLMFactory(ABC):

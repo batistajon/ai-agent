@@ -1,5 +1,5 @@
-from app.frameworks.routes import router
-from app.domain.interfaces.IFramework import IFramework
+from infrastructure.frameworks.routes.router import router
+from infrastructure.frameworks.domain.interfaces.IFramework import IFramework
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -36,4 +36,4 @@ class FastAPIFrameworkSingleton(IFramework):
 
 
     def load_routes(self, instance: object):
-        return instance.include_router(router.router)
+        return instance.include_router(router)
